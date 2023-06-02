@@ -34,45 +34,58 @@ class LayeredImage:
     def get_annotations(self):
         return [_layer_properties_to_annotation(layer_properties) for layer_properties in self.layer_properties_]
 
-    def add_layer(self, category_id: int, image_bgra: np.ndarray, visibility_threshold: float, attempt_limit: int):
+    def add_layer(
+        self,
+        category_id: int,
+        image_bgra: np.ndarray,
+        canvas_slice: tuple,
+        image_slice: tuple,
+        visibility_threshold: float,
+    ):
         image, image_mask = image_bgra[..., :3], image_bgra[..., 3] != 0
-        image_center_x_offset_limit = int(np.round(image.shape[1] * (visibility_threshold - 0.5)))
-        image_center_y_offset_limit = int(np.round(image.shape[0] * (visibility_threshold - 0.5)))
+        canvas_mask = np.zeros(self.canvas_.shape[:2], bool)
+        canvas_mask[canvas_slice] = image_mask[image_slice]
 
-        attempt_count = 0
-        while attempt_count < attempt_limit:
+        other_masks_visible_new = []
+        for layer_properties in self.layer_properties_:
+            other_visible_mask_new = layer_properties["mask_visible"].copy()
+            other_visible_mask_new[canvas_mask] = False
+            if np.count_nonzero(other_visible_mask_new) >= layer_properties["mask_visible_threshold"]:
+                other_masks_visible_new.append(other_visible_mask_new)
+            else:
+                break
+        if len(other_masks_visible_new) < len(self.layer_properties_):
+            return False
+
+        for layer_properties, mask_visible_new in zip(self.layer_properties_, other_masks_visible_new):
+            layer_properties["mask_visible"] = mask_visible_new
+        self.layer_properties_.append(
+            {
+                "category_id": category_id,
+                "mask_whole": canvas_mask,
+                "mask_visible": canvas_mask,
+                "mask_visible_threshold": int(np.count_nonzero(canvas_mask[canvas_slice] * visibility_threshold)),
+            }
+        )
+        self.canvas_[canvas_slice][image_mask[image_slice]] = image[image_slice][image_mask[image_slice]]
+
+        return True
+
+    def add_random_layer(
+        self, category_id: int, image_bgra: np.ndarray, visibility_threshold: float, failed_attempt_limit: int
+    ):
+        image_center_x_offset_limit = int(np.round(image_bgra.shape[1] * (visibility_threshold - 0.5)))
+        image_center_y_offset_limit = int(np.round(image_bgra.shape[0] * (visibility_threshold - 0.5)))
+
+        failed_attempt_count = 0
+        while failed_attempt_count < failed_attempt_limit:
             canvas_slice, image_slice = self._get_random_image_slice(
-                image_center_x_offset_limit, image_center_y_offset_limit, image.shape
+                image_center_x_offset_limit, image_center_y_offset_limit, image_bgra.shape
             )
+            if self.add_layer(category_id, image_bgra, canvas_slice, image_slice, visibility_threshold):
+                return True
 
-            canvas_mask = np.zeros(self.canvas_.shape[:2], bool)
-            canvas_mask[canvas_slice] = image_mask[image_slice]
-
-            other_masks_visible_new = []
-            for layer_properties in self.layer_properties_:
-                other_visible_mask_new = layer_properties["mask_visible"].copy()
-                other_visible_mask_new[canvas_mask] = False
-                if np.count_nonzero(other_visible_mask_new) >= layer_properties["mask_visible_threshold"]:
-                    other_masks_visible_new.append(other_visible_mask_new)
-                else:
-                    break
-            if len(other_masks_visible_new) < len(self.layer_properties_):
-                attempt_count += 1
-                continue
-
-            for layer_properties, mask_visible_new in zip(self.layer_properties_, other_masks_visible_new):
-                layer_properties["mask_visible"] = mask_visible_new
-            self.layer_properties_.append(
-                {
-                    "category_id": category_id,
-                    "mask_whole": canvas_mask,
-                    "mask_visible": canvas_mask,
-                    "mask_visible_threshold": int(np.count_nonzero(canvas_mask[canvas_slice] * visibility_threshold)),
-                }
-            )
-
-            self.canvas_[canvas_slice][image_mask[image_slice]] = image[image_slice][image_mask[image_slice]]
-            return True
+            failed_attempt_count += 1
 
         return False
 

@@ -92,20 +92,19 @@ class Generator2D:
                 )
                 for label_index_to_add in label_indices_to_add:
                     rotatable_image = self.rotatable_images_[labels[label_index_to_add]]
-                    attempt_count = 0
+                    failed_attempt_count = 0
                     while len(layered_image) < self.config_["composition"]["layering"]["max_count"]:
-                        if not layered_image.add_layer(
+                        if not layered_image.add_random_layer(
                             category_id=int(label_index_to_add),
                             image_bgra=self._randomize_rotatable_image(rotatable_image),
                             visibility_threshold=self.config_["composition"]["layering"]["visibility_threshold"],
-                            attempt_limit=self.config_["composition"]["layering"]["attempt_limit"],
+                            failed_attempt_limit=self.config_["composition"]["layering"]["failed_attempt_limit"],
                         ):
-                            attempt_count += 1
-                            if attempt_count == self.config_["composition"]["layering"]["attempt_limit"]:
+                            failed_attempt_count += 1
+                            if failed_attempt_count == self.config_["composition"]["layering"]["attempt_limit"]:
                                 break
-
-                annotations = layered_image.get_annotations()
-                image_ok = len(annotations) >= self.config_["composition"]["layering"]["min_count"]
+                image_ok = len(layered_image) >= self.config_["composition"]["layering"]["min_count"]
+                annotations = layered_image.get_annotations() if image_ok else []
             else:
                 image_ok, annotations = True, []
 

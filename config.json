@@ -5,8 +5,8 @@
     "extension": ".jpg",
     "num_images": 100,
     "unannotated_ratio": 0.1,
-    "width": 500,
-    "height": 500
+    "width": 300,
+    "height": 300
   },
   "background": {
     "min_random_width": 2,
@@ -36,7 +36,7 @@
       "max_count": 1,
       "allow_multiple_instances_of_same_object": false,
       "visibility_threshold": 0.9,
-      "attempt_limit": 10
+      "failed_attempt_limit": 10
     }
   },
   "hsv_randomization_bounds": [[-10, 10], [-50, 20], [-100, 20]]
