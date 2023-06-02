@@ -64,7 +64,7 @@ class LayeredImage:
                 "category_id": category_id,
                 "mask_whole": canvas_mask,
                 "mask_visible": canvas_mask,
-                "mask_visible_threshold": int(np.count_nonzero(canvas_mask[canvas_slice] * visibility_threshold)),
+                "mask_visible_threshold": int(np.count_nonzero(canvas_mask[canvas_slice]) * visibility_threshold),
             }
         )
         self.canvas_[canvas_slice][image_mask[image_slice]] = image[image_slice][image_mask[image_slice]]
