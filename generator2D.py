@@ -12,9 +12,9 @@ from layered_image import LayeredImage, rand_between
 from rotatable_image import RotatableImage
 
 
-def randomize_hsv(image_bgr, perturbation_bounds):
+def randomize_hsv(image_bgr, randomization_bounds):
     image_hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV).astype(np.int32)
-    image_hsv += np.round([rand_between(*bounds) for bounds in perturbation_bounds]).astype(np.int32)
+    image_hsv += np.round([rand_between(*bounds) for bounds in randomization_bounds]).astype(np.int32)
     image_hsv = np.clip(image_hsv, a_min=0, a_max=255).astype(np.uint8)
 
     image_bgr_randomized = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2BGR)
