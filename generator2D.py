@@ -3,17 +3,13 @@ import json
 import os
 import pathlib
 import sys
-from typing import Iterable
 
 import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+from layered_image import LayeredImage, rand_between
 from rotatable_image import RotatableImage
-
-
-def rand_between(lower, upper):
-    return lower + np.random.rand() * (upper - lower)
 
 
 def perturb_hsv(image_bgr, perturbation_bounds):
@@ -58,7 +54,7 @@ def generate_background(
     return base_texture_resized
 
 
-def rotate_image(rotatable_image: RotatableImage, euler_bounds_xyz, origin_uv_bounds):
+def randomly_rotate_image(rotatable_image: RotatableImage, euler_bounds_xyz, origin_uv_bounds):
     euler_angles = [rand_between(*bounds) for bounds in euler_bounds_xyz]
     rotation_matrix = Rotation.from_euler("xyz", euler_angles).as_matrix()
 
@@ -68,124 +64,81 @@ def rotate_image(rotatable_image: RotatableImage, euler_bounds_xyz, origin_uv_bo
     return rotated_image
 
 
-class LayeredImage:
-    def __init__(self, background: np.ndarray):
-        self.canvas_, self.layer_properties_ = background, []
-
-    @property
-    def composite(self):
-        return self.canvas_
-
-    @property
-    def layer_properties(self):
-        return self.layer_properties_
-
-    def add_layer(self, image_id, image_bgra: np.ndarray, visibility_threshold: float, attempt_limit: int):
-        image, image_mask = image_bgra[..., :3], image_bgra[..., 3] != 0
-        image_center_x_offset_limit = int(np.round(image.shape[1] * (visibility_threshold - 0.5)))
-        image_center_y_offset_limit = int(np.round(image.shape[0] * (visibility_threshold - 0.5)))
-
-        attempt_count = 0
-        while attempt_count < attempt_limit:
-            canvas_slice, image_slice = self._get_random_image_slice(
-                image_center_x_offset_limit, image_center_y_offset_limit, image.shape
-            )
-
-            canvas_mask = np.zeros(self.canvas_.shape[:2], bool)
-            canvas_mask[canvas_slice] = image_mask[image_slice]
-
-            other_masks_visible_new = []
-            for layer_properties in self.layer_properties_:
-                other_visible_mask_new = layer_properties["mask_visible"].copy()
-                other_visible_mask_new[canvas_mask] = False
-                if np.count_nonzero(other_visible_mask_new) >= layer_properties["mask_visible_threshold"]:
-                    other_masks_visible_new.append(other_visible_mask_new)
-                else:
-                    break
-            if len(other_masks_visible_new) < len(self.layer_properties_):
-                attempt_count += 1
-                continue
-
-            for layer_properties, mask_visible_new in zip(self.layer_properties_, other_masks_visible_new):
-                layer_properties["mask_visible"] = mask_visible_new
-            self.layer_properties_.append(
-                {
-                    "id": image_id,
-                    "mask_whole": canvas_mask,
-                    "mask_visible": canvas_mask,
-                    "mask_visible_threshold": int(np.count_nonzero(canvas_mask[canvas_slice] * visibility_threshold)),
-                }
-            )
-
-            self.canvas_[canvas_slice][image_mask[image_slice]] = image[image_slice][image_mask[image_slice]]
-            return True
-
-        return False
-
-    def _get_random_image_slice(
-        self,
-        image_center_x_offset_limit: int,
-        image_center_y_offset_limit: int,
-        image_shape: Iterable[int],
-    ):
-        image_center_x_offset = int(
-            np.round(rand_between(image_center_x_offset_limit, self.canvas_.shape[1] - image_center_x_offset_limit))
-        )
-        image_center_y_offset = int(
-            np.round(rand_between(image_center_y_offset_limit, self.canvas_.shape[0] - image_center_y_offset_limit))
-        )
-        half_image_shape = np.ceil(np.array(image_shape[:2], float) / 2).astype(np.int32)
-
-        canvas_xmin_raw = image_center_x_offset - half_image_shape[1]
-        canvas_ymin_raw = image_center_y_offset - half_image_shape[0]
-        canvas_xmin = max(0, canvas_xmin_raw)
-        canvas_ymin = max(0, canvas_ymin_raw)
-        canvas_xmax = min(self.canvas_.shape[1], canvas_xmin + image_shape[1] - (canvas_xmin - canvas_xmin_raw))
-        canvas_ymax = min(self.canvas_.shape[0], canvas_ymin + image_shape[0] - (canvas_ymin - canvas_ymin_raw))
-        image_xmin = half_image_shape[1] - (image_center_x_offset - canvas_xmin)
-        image_ymin = half_image_shape[0] - (image_center_y_offset - canvas_ymin)
-        image_xmax = image_xmin + (canvas_xmax - canvas_xmin)
-        image_ymax = image_ymin + (canvas_ymax - canvas_ymin)
-
-        canvas_slice = np.index_exp[canvas_ymin:canvas_ymax, canvas_xmin:canvas_xmax]
-        image_slice = np.index_exp[image_ymin:image_ymax, image_xmin:image_xmax]
-
-        return canvas_slice, image_slice
-
-
 class Generator2D:
     def __init__(self, config_filepath: str):
         self.config_ = json.load(open(config_filepath, "r"))
-        self.objects_ = load_rotatable_images(self.config_["io"]["template_dir"])
+        self.rotatable_images_ = load_rotatable_images(self.config_["io"]["template_dir"])
 
     def generate(self):
+        labels = sorted(self.rotatable_images_.keys())
+        metadata = {
+            "type": "instances",
+            "categories": [{"supercategory": "none", "id": index, "name": label} for index, label in enumerate(labels)],
+            "images": [],
+            "annotations": [],
+        }
+
+        unannotated_gen_modulus = int(self.config_["io"]["num_images"] * self.config_["io"]["unannotated_ratio"])
         if not os.path.exists(self.config_["io"]["output_dir"]):
             os.mkdir(self.config_["io"]["output_dir"])
 
-        labels = sorted(self.objects_.keys())
+        while len(metadata["images"]) < self.config_["io"]["num_images"]:
+            layered_image = LayeredImage(self._generate_background())
+            if unannotated_gen_modulus <= 0 or len(metadata["images"]) % unannotated_gen_modulus != 0:
+                label_indices_to_add = np.random.choice(
+                    len(labels),
+                    self.config_["composition"]["layering"]["max_count"],
+                    replace=self.config_["composition"]["layering"]["allow_multiple_instances_of_same_object"],
+                )
+                for label_index_to_add in label_indices_to_add:
+                    rotatable_image = self.rotatable_images_[labels[label_index_to_add]]
+                    attempt_count = 0
+                    while len(layered_image) < self.config_["composition"]["layering"]["max_count"]:
+                        if not layered_image.add_layer(
+                            category_id=int(label_index_to_add),
+                            image_bgra=self._randomize_rotatable_image(rotatable_image),
+                            visibility_threshold=self.config_["composition"]["layering"]["visibility_threshold"],
+                            attempt_limit=self.config_["composition"]["layering"]["attempt_limit"],
+                        ):
+                            attempt_count += 1
+                            if attempt_count == self.config_["composition"]["layering"]["attempt_limit"]:
+                                break
 
-        layered_image = LayeredImage(self._generate_background())
-        for i in range(3):
-            layered_image.add_layer(
-                image_id=0,
-                image_bgra=self._randomize_rotatable_image(self.objects_[labels[0]]),
-                visibility_threshold=self.config_["composition"]["layering"]["visibility_threshold"],
-                attempt_limit=self.config_["composition"]["layering"]["attempt_limit"],
-            )
-        cv2.imwrite("test.png", layered_image.composite)
+                annotations = layered_image.get_annotations()
+                image_ok = len(annotations) >= self.config_["composition"]["layering"]["min_count"]
+            else:
+                image_ok, annotations = True, []
 
-    def _perturb_hsv(self, image_bgr):
-        return perturb_hsv(image_bgr, self.config_["hsv_perturbation_bounds"])
+            if image_ok:
+                image_metadata = {
+                    "id": (image_id := len(metadata["images"]) + 1),
+                    "file_name": "{}{}".format(image_id, self.config_["io"]["extension"]),
+                    "width": self.config_["io"]["width"],
+                    "height": self.config_["io"]["height"],
+                }
+                metadata["images"].append(image_metadata)
+                image_filepath = os.path.join(self.config_["io"]["output_dir"], image_metadata["file_name"])
+                cv2.imwrite(image_filepath, layered_image.composite)
+
+                for annotation in annotations:
+                    annotation["image_id"] = image_metadata["id"]
+                    annotation["id"] = len(metadata["annotations"]) + 1
+                    metadata["annotations"].append(annotation)
+
+        metadata_filepath = os.path.join(self.config_["io"]["output_dir"], "metadata.json")
+        json.dump(obj=metadata, fp=open(metadata_filepath, "w"), indent=4)
 
     def _generate_background(self):
-        return generate_background(
-            **self.config_["background"],
-            output_width=self.config_["io"]["width"],
-            output_height=self.config_["io"]["height"]
+        return self._perturb_hsv(
+            generate_background(
+                **self.config_["background"],
+                output_width=self.config_["io"]["width"],
+                output_height=self.config_["io"]["height"],
+            )
         )
 
     def _randomize_rotatable_image(self, rotatable_image: RotatableImage):
-        image = rotate_image(rotatable_image, **self.config_["objects"]["rotation_randomization"])
+        image = randomly_rotate_image(rotatable_image, **self.config_["objects"]["rotation_randomization"])
 
         image[..., :3] = self._perturb_hsv(image[..., :3])
 
@@ -211,6 +164,9 @@ class Generator2D:
         image_fitted = cv2.resize(image, dsize=None, fx=scale, fy=scale, interpolation=cv2.INTER_NEAREST)
 
         return image_fitted
+
+    def _perturb_hsv(self, image_bgr):
+        return perturb_hsv(image_bgr, self.config_["hsv_perturbation_bounds"])
 
 
 if __name__ == "__main__":
