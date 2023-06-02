@@ -12,14 +12,14 @@ from layered_image import LayeredImage, rand_between
 from rotatable_image import RotatableImage
 
 
-def perturb_hsv(image_bgr, perturbation_bounds):
+def randomize_hsv(image_bgr, perturbation_bounds):
     image_hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV).astype(np.int32)
     image_hsv += np.round([rand_between(*bounds) for bounds in perturbation_bounds]).astype(np.int32)
     image_hsv = np.clip(image_hsv, a_min=0, a_max=255).astype(np.uint8)
 
-    image_bgr_perturbed = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2BGR)
+    image_bgr_randomized = cv2.cvtColor(image_hsv, cv2.COLOR_HSV2BGR)
 
-    return image_bgr_perturbed
+    return image_bgr_randomized
 
 
 def load_rotatable_images(images_dir: str):
@@ -129,7 +129,7 @@ class Generator2D:
         json.dump(obj=metadata, fp=open(metadata_filepath, "w"), indent=4)
 
     def _generate_background(self):
-        return self._perturb_hsv(
+        return self._randomize_hsv(
             generate_background(
                 **self.config_["background"],
                 output_width=self.config_["io"]["width"],
@@ -140,7 +140,7 @@ class Generator2D:
     def _randomize_rotatable_image(self, rotatable_image: RotatableImage):
         image = randomly_rotate_image(rotatable_image, **self.config_["objects"]["rotation_randomization"])
 
-        image[..., :3] = self._perturb_hsv(image[..., :3])
+        image[..., :3] = self._randomize_hsv(image[..., :3])
 
         fx = rand_between(*self.config_["objects"]["scaling_randomization"]["horizontal_bounds"])
         fy = rand_between(*self.config_["objects"]["scaling_randomization"]["vertical_bounds"])
@@ -165,8 +165,8 @@ class Generator2D:
 
         return image_fitted
 
-    def _perturb_hsv(self, image_bgr):
-        return perturb_hsv(image_bgr, self.config_["hsv_perturbation_bounds"])
+    def _randomize_hsv(self, image_bgr):
+        return randomize_hsv(image_bgr, self.config_["hsv_randomization_bounds"])
 
 
 if __name__ == "__main__":

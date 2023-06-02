@@ -3,8 +3,8 @@
     "template_dir": "/home/james/data/object_detection_templates/pedestrian_crossing_light/",
     "output_dir": "/home/james/data/trafficlight/training/gen/",
     "extension": ".jpg",
-    "num_images": 3000,
-    "unannotated_ratio": 0.05,
+    "num_images": 100,
+    "unannotated_ratio": 0.1,
     "width": 500,
     "height": 500
   },
@@ -34,10 +34,10 @@
     "layering": {
       "min_count": 1,
       "max_count": 1,
-      "repeat": false,
+      "allow_multiple_instances_of_same_object": false,
       "visibility_threshold": 0.9,
       "attempt_limit": 10
     }
   },
-  "hsv_perturbation_bounds": [[-10, 10], [-50, 20], [-100, 20]]
+  "hsv_randomization_bounds": [[-10, 10], [-50, 20], [-100, 20]]
 }
