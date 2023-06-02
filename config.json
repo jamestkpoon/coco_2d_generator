@@ -1,0 +1,43 @@
+{
+  "io": {
+    "template_dir": "/home/james/data/object_detection_templates/pedestrian_crossing_light/",
+    "output_dir": "/home/james/data/trafficlight/training/gen/",
+    "extension": ".jpg",
+    "num_images": 3000,
+    "unannotated_ratio": 0.05,
+    "width": 500,
+    "height": 500
+  },
+  "background": {
+    "min_random_width": 2,
+    "max_random_width": 100,
+    "min_random_height": 2,
+    "max_random_height": 100
+  },
+  "objects": {
+    "rotation_randomization": {
+      "euler_bounds_xyz": [[-0.2, 0.2], [-0.5, 0.5], [-0.2, 0.2]],
+      "origin_uv_bounds": [[0.4, 0.4], [0.6, 0.6]]
+    },
+    "scaling_randomization": {
+      "horizontal_bounds": [0.8, 1.2],
+      "vertical_bounds": [0.8, 1.2]
+    }
+  },
+  "composition": {
+    "object_occupancy": {
+      "min_width_percentage": 0.1,
+      "min_height_percentage": 0.1,
+      "max_width_percentage": 0.3,
+      "max_height_percentage": 0.3
+    },
+    "layering": {
+      "min_count": 1,
+      "max_count": 1,
+      "repeat": false,
+      "visibility_threshold": 0.9,
+      "attempt_limit": 10
+    }
+  },
+  "hsv_perturbation_bounds": [[-10, 10], [-50, 20], [-100, 20]]
+}
