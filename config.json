@@ -39,5 +39,5 @@
       "failed_attempt_limit": 10
     }
   },
-  "hsv_randomization_bounds": [[-10, 10], [-50, 20], [-100, 20]]
+  "hsv_randomization_bounds": [[-20, 20], [-50, 20], [-100, 20]]
 }
