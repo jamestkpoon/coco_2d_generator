@@ -95,7 +95,7 @@ class Generator2D:
                     rotatable_image = self.rotatable_images_[labels[label_index_to_add]]
                     failed_attempt_count = 0
                     while len(layered_image) < self.config_["composition"]["layering"]["max_count"]:
-                        if not layered_image.add_random_layer(
+                        if not layered_image.add_layer_at_random_position(
                             category_id=int(label_index_to_add),
                             image_bgra=self._randomize_rotatable_image(rotatable_image),
                             visibility_threshold=self.config_["composition"]["layering"]["visibility_threshold"],

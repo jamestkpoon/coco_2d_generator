@@ -71,17 +71,12 @@ class LayeredImage:
 
         return True
 
-    def add_random_layer(
+    def add_layer_at_random_position(
         self, category_id: int, image_bgra: np.ndarray, visibility_threshold: float, failed_attempt_limit: int
     ):
-        image_center_x_offset_limit = int(np.round(image_bgra.shape[1] * (visibility_threshold - 0.5)))
-        image_center_y_offset_limit = int(np.round(image_bgra.shape[0] * (visibility_threshold - 0.5)))
-
         failed_attempt_count = 0
         while failed_attempt_count < failed_attempt_limit:
-            canvas_slice, image_slice = self._get_random_image_slice(
-                image_center_x_offset_limit, image_center_y_offset_limit, image_bgra.shape
-            )
+            canvas_slice, image_slice = self._get_random_image_slice(image_bgra.shape, visibility_threshold)
             if self.add_layer(category_id, image_bgra, canvas_slice, image_slice, visibility_threshold):
                 return True
 
@@ -89,12 +84,9 @@ class LayeredImage:
 
         return False
 
-    def _get_random_image_slice(
-        self,
-        image_center_x_offset_limit: int,
-        image_center_y_offset_limit: int,
-        image_shape: tuple[int],
-    ):
+    def _get_random_image_slice(self, image_shape: tuple[int], visibility_threshold: float):
+        image_center_x_offset_limit = int(np.round(image_shape[1] * (visibility_threshold - 0.5)))
+        image_center_y_offset_limit = int(np.round(image_shape[0] * (visibility_threshold - 0.5)))
         image_center_x_offset = int(
             np.round(rand_between(image_center_x_offset_limit, self.canvas_.shape[1] - image_center_x_offset_limit))
         )
