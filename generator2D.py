@@ -103,7 +103,9 @@ class Generator2D:
                             if failed_attempt_count == self.config_["composition"]["layering"]["attempt_limit"]:
                                 break
                 image_ok = len(layered_image) >= self.config_["composition"]["layering"]["min_count"]
-                annotations = layered_image.get_annotations() if image_ok else []
+                annotations = (
+                    layered_image.get_annotations(self.config_["segmentation_approxpoly_eps"]) if image_ok else []
+                )
             else:
                 image_ok, annotations = True, []
 

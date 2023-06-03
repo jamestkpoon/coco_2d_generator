@@ -6,10 +6,13 @@ def rand_between(lower, upper):
     return lower + np.random.rand() * (upper - lower)
 
 
-def _layer_properties_to_annotation(layer_properties: dict):
+def _layer_properties_to_annotation(layer_properties: dict, segmentation_approxpoly_eps: float):
     contour = cv2.findContours(
         layer_properties["mask_whole"].astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
     )[0][0]
+
+    if segmentation_approxpoly_eps > 0.0:
+        contour = cv2.approxPolyDP(contour, segmentation_approxpoly_eps * cv2.arcLength(contour, True), True)
 
     return {
         "category_id": layer_properties["category_id"],
@@ -31,8 +34,11 @@ class LayeredImage:
     def __len__(self):
         return len(self.layer_properties_)
 
-    def get_annotations(self):
-        return [_layer_properties_to_annotation(layer_properties) for layer_properties in self.layer_properties_]
+    def get_annotations(self, segmentation_approxpoly_eps: float):
+        return [
+            _layer_properties_to_annotation(layer_properties, segmentation_approxpoly_eps)
+            for layer_properties in self.layer_properties_
+        ]
 
     def add_layer(
         self,

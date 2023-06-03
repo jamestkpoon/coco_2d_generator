@@ -8,6 +8,8 @@
     "width": 300,
     "height": 300
   },
+  "hsv_randomization_bounds": [[-20, 20], [-50, 20], [-100, 20]],
+  "segmentation_approxpoly_eps": 0.03,
   "background": {
     "min_random_width": 2,
     "max_random_width": 100,
@@ -38,6 +40,5 @@
       "visibility_threshold": 0.9,
       "failed_attempt_limit": 10
     }
-  },
-  "hsv_randomization_bounds": [[-20, 20], [-50, 20], [-100, 20]]
+  }
 }
