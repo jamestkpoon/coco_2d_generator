@@ -23,19 +23,25 @@ def randomize_hsv(image_bgr, randomization_bounds):
     return image_bgr_randomized
 
 
-def load_rotatable_images(images_dir: str):
-    rotatable_images = {}
-    for filepath in glob.glob(os.path.join(images_dir, "*")):
+def load_rotatable_image_classes(images_dir: str):
+    classes = []
+    for filepath in glob.glob(os.path.join(images_dir, "**", "*")):
         try:
             image = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
             rotatable_image = RotatableImage(image)
         except:
             continue
 
-        label = pathlib.Path(filepath).stem
-        rotatable_images[label] = rotatable_image
+        path = pathlib.Path(filepath)
+        classes.append(
+            {
+                "image": rotatable_image,
+                "label": path.stem,
+                "supercategory": path.parent.stem,
+            }
+        )
 
-    return rotatable_images
+    return classes
 
 
 def generate_background(
@@ -68,13 +74,15 @@ def randomly_rotate_image(rotatable_image: RotatableImage, euler_bounds_xyz, ori
 class Generator2D:
     def __init__(self, config_filepath: str):
         self.config_ = json.load(open(config_filepath, "r"))
-        self.rotatable_images_ = load_rotatable_images(self.config_["io"]["template_dir"])
+        self.objects_ = load_rotatable_image_classes(self.config_["io"]["template_dir"])
 
     def generate(self):
-        labels = sorted(self.rotatable_images_.keys())
         metadata = {
             "type": "instances",
-            "categories": [{"supercategory": "none", "id": index, "name": label} for index, label in enumerate(labels)],
+            "categories": [
+                {"supercategory": obj["supercategory"], "id": index, "name": obj["label"]}
+                for index, obj in enumerate(self.objects_)
+            ],
             "images": [],
             "annotations": [],
         }
@@ -86,17 +94,17 @@ class Generator2D:
         while len(metadata["images"]) < self.config_["io"]["num_images"]:
             layered_image = LayeredImage(self._generate_background())
             if unannotated_gen_modulus <= 0 or len(metadata["images"]) % unannotated_gen_modulus != 0:
-                label_indices_to_add = np.random.choice(
-                    len(labels),
+                object_indices_to_add = np.random.choice(
+                    len(self.objects_),
                     self.config_["composition"]["layering"]["max_count"],
                     replace=self.config_["composition"]["layering"]["allow_multiple_instances_of_same_object"],
                 )
-                for label_index_to_add in label_indices_to_add:
-                    rotatable_image = self.rotatable_images_[labels[label_index_to_add]]
+                for object_index_to_add in object_indices_to_add:
+                    rotatable_image = self.objects_[object_index_to_add]["image"]
                     failed_attempt_count = 0
                     while len(layered_image) < self.config_["composition"]["layering"]["max_count"]:
                         if not layered_image.add_layer_at_random_position(
-                            category_id=int(label_index_to_add),
+                            category_id=int(object_index_to_add),
                             image_bgra=self._randomize_rotatable_image(rotatable_image),
                             visibility_threshold=self.config_["composition"]["layering"]["visibility_threshold"],
                             failed_attempt_limit=self.config_["composition"]["layering"]["failed_attempt_limit"],
@@ -126,7 +134,7 @@ class Generator2D:
                     metadata["annotations"].append(annotation)
 
         metadata_filepath = os.path.join(self.config_["io"]["output_dir"], "metadata.json")
-        json.dump(obj=metadata, fp=open(metadata_filepath, "w"), indent=4)
+        json.dump(obj=metadata, fp=open(metadata_filepath, "w"))
 
     def _generate_background(self):
         return self._randomize_hsv(
