@@ -1,4 +1,3 @@
-import glob
 import json
 import os
 import pathlib
@@ -23,44 +22,21 @@ def randomize_hsv(image_bgr, randomization_bounds):
     return image_bgr_randomized
 
 
-def load_rotatable_image_classes(images_dir: str, use_supercategory_as_class: bool = False):
-    classes, categories = [], []
-    for filepath in glob.glob(os.path.join(images_dir, "*", "*")):
-        image = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
-        if not isinstance(image, np.ndarray) or len(image.shape) != 3:
-            continue
-        if image.shape[2] == 3:
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
-        rotatable_image = RotatableImage(image)
+def load_rotatable_images(category_config_filepath: str):
+    rotatable_image_dicts, categories = [], []
+    supercategory_config = json.load(open(category_config_filepath, "r"))
+    data_dir = pathlib.Path(category_config_filepath).parent
+    for supercategory, category_config in supercategory_config.items():
+        for category_name, image_filenames in category_config.items():
+            categories.append({"id": len(categories) + 1, "name": category_name, "supercategory": supercategory})
+            for image_filename in image_filenames:
+                image = cv2.imread(os.path.join(data_dir, image_filename), cv2.IMREAD_UNCHANGED)
+                if not isinstance(image, np.ndarray) or len(image.shape) != 3:
+                    continue
+                image = image if image.shape[2] == 4 else cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+                rotatable_image_dicts.append({"category_id": categories[-1]["id"], "image": RotatableImage(image)})
 
-        category_index = None
-        path = pathlib.Path(filepath)
-        if use_supercategory_as_class:
-            name, supercategory = path.parent.stem, "none"
-            try:
-                category_index = [category["supercategory"] for category in categories].index(supercategory)
-                is_new_category = False
-            except ValueError:
-                is_new_category = True
-        else:
-            name, supercategory = path.stem, path.parent.stem
-            is_new_category = True
-
-        if is_new_category:
-            categories.append(
-                {
-                    "id": len(categories) + 1,
-                    "name": name,
-                    "supercategory": supercategory,
-                }
-            )
-            category_index = -1
-
-        if category_index is None:
-            raise ValueError("Invalid category index")
-        classes.append({"category_id": categories[category_index]["id"], "image": rotatable_image})
-
-    return classes, categories
+    return rotatable_image_dicts, categories
 
 
 def generate_background(
@@ -93,9 +69,7 @@ def randomly_rotate_image(rotatable_image: RotatableImage, euler_bounds_xyz, ori
 class Generator2D:
     def __init__(self, config_filepath: str):
         self.config_ = json.load(open(config_filepath, "r"))
-        self.objects_, self.categories_ = load_rotatable_image_classes(
-            self.config_["io"]["template_dir"], self.config_["io"]["use_supercategory_as_class"]
-        )
+        self.objects_, self.categories_ = load_rotatable_images(self.config_["io"]["category_config_filepath"])
 
     def generate(self):
         metadata = {"type": "instances", "categories": self.categories_, "images": [], "annotations": []}

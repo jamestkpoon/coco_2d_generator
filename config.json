@@ -1,13 +1,12 @@
 {
   "io": {
-    "template_dir": "/home/james/data/object_detection_templates/pedestrian_crossing_light/",
+    "category_config_filepath": "/home/james/data/object_detection_templates/pedestrian_crossing_light/categories.json",
     "output_dir": "/home/james/data/trafficlight/training/gen/",
     "extension": ".jpg",
     "num_images": 100,
     "unannotated_ratio": 0.1,
     "width": 300,
-    "height": 300,
-    "use_supercategory_as_class": true
+    "height": 300
   },
   "background": {
     "min_random_width": 2,
