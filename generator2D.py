@@ -23,25 +23,44 @@ def randomize_hsv(image_bgr, randomization_bounds):
     return image_bgr_randomized
 
 
-def load_rotatable_image_classes(images_dir: str):
-    classes = []
-    for filepath in glob.glob(os.path.join(images_dir, "**", "*")):
-        try:
-            image = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
-            rotatable_image = RotatableImage(image)
-        except:
+def load_rotatable_image_classes(images_dir: str, use_supercategory_as_class: bool = False):
+    classes, categories = [], []
+    for filepath in glob.glob(os.path.join(images_dir, "*", "*")):
+        image = cv2.imread(filepath, cv2.IMREAD_UNCHANGED)
+        if not isinstance(image, np.ndarray) or len(image.shape) != 3:
             continue
+        if image.shape[2] == 3:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+        rotatable_image = RotatableImage(image)
 
+        category_index = None
         path = pathlib.Path(filepath)
-        classes.append(
-            {
-                "image": rotatable_image,
-                "label": path.stem,
-                "supercategory": path.parent.stem,
-            }
-        )
+        if use_supercategory_as_class:
+            name, supercategory = path.parent.stem, "none"
+            try:
+                category_index = [category["supercategory"] for category in categories].index(supercategory)
+                is_new_category = False
+            except ValueError:
+                is_new_category = True
+        else:
+            name, supercategory = path.stem, path.parent.stem
+            is_new_category = True
 
-    return classes
+        if is_new_category:
+            categories.append(
+                {
+                    "id": len(categories) + 1,
+                    "name": name,
+                    "supercategory": supercategory,
+                }
+            )
+            category_index = -1
+
+        if category_index is None:
+            raise ValueError("Invalid category index")
+        classes.append({"category_id": categories[category_index]["id"], "image": rotatable_image})
+
+    return classes, categories
 
 
 def generate_background(
@@ -74,38 +93,35 @@ def randomly_rotate_image(rotatable_image: RotatableImage, euler_bounds_xyz, ori
 class Generator2D:
     def __init__(self, config_filepath: str):
         self.config_ = json.load(open(config_filepath, "r"))
-        self.objects_ = load_rotatable_image_classes(self.config_["io"]["template_dir"])
+        self.objects_, self.categories_ = load_rotatable_image_classes(
+            self.config_["io"]["template_dir"], self.config_["io"]["use_supercategory_as_class"]
+        )
 
     def generate(self):
-        metadata = {
-            "type": "instances",
-            "categories": [
-                {"supercategory": obj["supercategory"], "id": index, "name": obj["label"]}
-                for index, obj in enumerate(self.objects_)
-            ],
-            "images": [],
-            "annotations": [],
-        }
-
-        unannotated_gen_modulus = int(self.config_["io"]["num_images"] * self.config_["io"]["unannotated_ratio"])
+        metadata = {"type": "instances", "categories": self.categories_, "images": [], "annotations": []}
         if not os.path.exists(self.config_["io"]["output_dir"]):
             os.mkdir(self.config_["io"]["output_dir"])
 
+        unannotated_gen_modulus = int(self.config_["io"]["num_images"] * self.config_["io"]["unannotated_ratio"])
         while len(metadata["images"]) < self.config_["io"]["num_images"]:
             layered_image = LayeredImage(self._generate_background())
             if unannotated_gen_modulus <= 0 or len(metadata["images"]) % unannotated_gen_modulus != 0:
-                object_indices_to_add = np.random.choice(
-                    len(self.objects_),
+                category_indices_to_add = np.random.choice(
+                    len(self.categories_),
                     self.config_["composition"]["layering"]["max_count"],
-                    replace=self.config_["composition"]["layering"]["allow_multiple_instances_of_same_object"],
+                    replace=self.config_["composition"]["layering"]["allow_multiple_instances_of_same_category"],
                 )
-                for object_index_to_add in object_indices_to_add:
-                    rotatable_image = self.objects_[object_index_to_add]["image"]
+                for category_id_to_add in [self.categories_[index]["id"] for index in category_indices_to_add]:
+                    object_index_to_add = np.random.choice(
+                        [index for index, obj in enumerate(self.objects_) if obj["category_id"] == category_id_to_add]
+                    )
+                    object_to_add = self.objects_[object_index_to_add]
+
                     failed_attempt_count = 0
                     while len(layered_image) < self.config_["composition"]["layering"]["max_count"]:
                         if not layered_image.add_layer_at_random_position(
-                            category_id=int(object_index_to_add),
-                            image_bgra=self._randomize_rotatable_image(rotatable_image),
+                            category_id=object_to_add["category_id"],
+                            image_bgra=self._randomize_rotatable_image(object_to_add["image"]),
                             visibility_threshold=self.config_["composition"]["layering"]["visibility_threshold"],
                             failed_attempt_limit=self.config_["composition"]["layering"]["failed_attempt_limit"],
                         ):

@@ -6,7 +6,8 @@
     "num_images": 100,
     "unannotated_ratio": 0.1,
     "width": 300,
-    "height": 300
+    "height": 300,
+    "use_supercategory_as_class": true
   },
   "background": {
     "min_random_width": 2,
@@ -34,7 +35,7 @@
     "layering": {
       "min_count": 1,
       "max_count": 1,
-      "allow_multiple_instances_of_same_object": false,
+      "allow_multiple_instances_of_same_category": false,
       "visibility_threshold": 0.9,
       "failed_attempt_limit": 10
     }
