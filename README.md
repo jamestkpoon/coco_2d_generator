@@ -72,7 +72,7 @@ Please refer to the example ./config.json.
     "layering": {
       "min_count": min objects per output image (int),
       "max_count": max objects per output image (int),
-      "allow_multiple_instances_of_same_category": used as replace kwarg in np.random.choice for selecting categories to draw from (boolean,
+      "allow_multiple_instances_of_same_category": used as replace kwarg in np.random.choice for selecting categories to draw from (boolean),
       "visibility_threshold": visibility ratio threshold of each object for the final image to be valid (float),
       "failed_attempt_limit": cap of random object placement iterations (int)
     }
