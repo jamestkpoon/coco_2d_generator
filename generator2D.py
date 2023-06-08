@@ -73,8 +73,8 @@ class Generator2D:
 
     def generate(self):
         metadata = {"type": "instances", "categories": self.categories_, "images": [], "annotations": []}
-        if not os.path.exists(self.config_["io"]["output_dir"]):
-            os.mkdir(self.config_["io"]["output_dir"])
+        images_output_dir = os.path.join(self.config_["io"]["output_dir"], "data")
+        pathlib.Path(images_output_dir).mkdir(parents=True, exist_ok=True)
 
         unannotated_gen_modulus = int(self.config_["io"]["num_images"] * self.config_["io"]["unannotated_ratio"])
         while len(metadata["images"]) < self.config_["io"]["num_images"]:
@@ -117,7 +117,7 @@ class Generator2D:
                     "height": self.config_["io"]["height"],
                 }
                 metadata["images"].append(image_metadata)
-                image_filepath = os.path.join(self.config_["io"]["output_dir"], image_metadata["file_name"])
+                image_filepath = os.path.join(images_output_dir, image_metadata["file_name"])
                 cv2.imwrite(image_filepath, layered_image.composite)
 
                 for annotation in annotations:
@@ -125,7 +125,7 @@ class Generator2D:
                     annotation["id"] = len(metadata["annotations"]) + 1
                     metadata["annotations"].append(annotation)
 
-        metadata_filepath = os.path.join(self.config_["io"]["output_dir"], "metadata.json")
+        metadata_filepath = os.path.join(self.config_["io"]["output_dir"], "labels.json")
         json.dump(obj=metadata, fp=open(metadata_filepath, "w"))
 
     def _generate_background(self):
