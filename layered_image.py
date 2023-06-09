@@ -7,18 +7,17 @@ def rand_between(lower, upper):
 
 
 def _layer_properties_to_annotation(layer_properties: dict, segmentation_approxpoly_eps: float):
-    contour = cv2.findContours(
-        layer_properties["mask_whole"].astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE
-    )[0][0]
+    mask_whole = layer_properties["mask_whole"].astype(np.uint8)
 
+    contour = cv2.findContours(mask_whole, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0][0]
     if segmentation_approxpoly_eps > 0.0:
         contour = cv2.approxPolyDP(contour, segmentation_approxpoly_eps * cv2.arcLength(contour, True), True)
 
     return {
         "category_id": layer_properties["category_id"],
         "segmentation": [contour.ravel().tolist()],
-        "area": cv2.contourArea(contour),
-        "bbox": cv2.boundingRect(contour),
+        "area": np.count_nonzero(mask_whole),
+        "bbox": cv2.boundingRect(mask_whole),
         "iscrowd": 0,
     }
 
