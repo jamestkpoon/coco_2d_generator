@@ -12,6 +12,12 @@ Usage:
 python3 generator2D.py /path/to/config.json
 ```
 
+To split the resultant labels.json into labels_training.json and labels_validation.json:
+```commandline
+python3 split_labels.py /path/to/labels.json VALIDATION_RATIO
+```
+where e.g. if labels.json contains 5000 images and VALIDATION_RATIO is 0.1, the first 500 image entries and their corresponding annotations will be moved into labels_validation.json. The remaining entries will be in labels_training.json. This script does not modify labels.json. 
+
 ## Category template configuration
 Category configuration is expected to be a .json structured as follows:
 ```commandline
