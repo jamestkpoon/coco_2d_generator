@@ -1,12 +1,12 @@
 {
   "io": {
     "category_config_filepath": "/home/james/data/object_detection_templates/pedestrian_crossing_light/categories.json",
-    "output_dir": "/home/james/data/trafficlight/training/validation/",
+    "output_dir": "/home/james/data/trafficlight/training/training/",
     "extension": ".jpg",
-    "num_images": 500,
-    "unannotated_ratio": 0.05,
-    "width": 300,
-    "height": 300
+    "num_images": 5000,
+    "unannotated_ratio": 0.005,
+    "width": 320,
+    "height": 320
   },
   "hsv_randomization_bounds": [[-10, 10], [-50, 20], [-100, 20]],
   "segmentation_approxpoly_eps": 0.01,
@@ -28,7 +28,7 @@
   },
   "composition": {
     "object_occupancy": {
-      "min_width_percentage": 0.1,
+      "min_width_percentage": 0.05,
       "min_height_percentage": 0.1,
       "max_width_percentage": 0.3,
       "max_height_percentage": 0.3
