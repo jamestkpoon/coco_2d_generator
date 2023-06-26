@@ -76,10 +76,11 @@ class Generator2D:
         images_output_dir = os.path.join(self.config_["io"]["output_dir"], "data")
         pathlib.Path(images_output_dir).mkdir(parents=True, exist_ok=True)
 
-        unannotated_gen_modulus = int(self.config_["io"]["num_images"] * self.config_["io"]["unannotated_ratio"])
+        unannotated_ratio = self.config_["io"]["unannotated_ratio"]
+        unannotated_gen_modulus = 0 if unannotated_ratio <= 0.0 else int(1.0 / unannotated_ratio)
         while len(metadata["images"]) < self.config_["io"]["num_images"]:
             layered_image = LayeredImage(self._generate_background())
-            if unannotated_gen_modulus <= 0 or len(metadata["images"]) % unannotated_gen_modulus != 0:
+            if unannotated_gen_modulus > 0 and len(metadata["images"]) % unannotated_gen_modulus != 0:
                 category_indices_to_add = np.random.choice(
                     len(self.categories_),
                     self.config_["composition"]["layering"]["max_count"],
